@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Budget Tracker - Fresh Start</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            background: rgba(255,255,255,0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .icon { font-size: 4rem; margin-bottom: 20px; }
+        h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        p { font-size: 1.2rem; margin-bottom: 30px; opacity: 0.9; }
+        .buttons { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        .btn-secondary {
+            background: #2196F3;
+            color: white;
+        }
+        .btn-warning {
+            background: #FF9800;
+            color: white;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">💰</div>
+        <h1>Budget Tracker</h1>
+        <p>Your personal finance manager is ready!</p>
+        
+        <div class="buttons">
+            <a href="http://localhost:5173" target="_blank" class="btn btn-primary">
+                🚀 Open App
+            </a>
+            <button onclick="clearCache()" class="btn btn-secondary">
+                🧹 Clear Cache
+            </button>
+            <button onclick="runTests()" class="btn btn-warning">
+                🧪 Test APIs
+            </button>
+        </div>
+        
+        <div id="status" class="status">
+            Ready to launch...
+        </div>
+    </div>
+
+    <script>
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = message;
+        }
+
+        async function clearCache() {
+            updateStatus('🧹 Clearing cache...');
+            try {
+                // Clear service worker cache
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(
+                        cacheNames.map(cacheName => caches.delete(cacheName))
+                    );
+                }
+                
+                // Unregister service worker
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    await Promise.all(
+                        registrations.map(registration => registration.unregister())
+                    );
+                }
+                
+                updateStatus('✅ Cache cleared! Refresh the main app page.');
+            } catch (error) {
+                updateStatus('❌ Error clearing cache: ' + error.message);
+            }
+        }
+
+        async function runTests() {
+            updateStatus('🧪 Testing backend connection...');
+            try {
+                // Test backend health
+                const healthResponse = await fetch('http://localhost:3001/api/');
+                const healthData = await healthResponse.json();
+                
+                if (healthResponse.ok) {
+                    updateStatus(`✅ Backend connected: ${healthData.message}`);
+                    
+                    // Test demo login
+                    const loginResponse = await fetch('http://localhost:3001/api/users/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: 'demo@budgettracker.com',
+                            password: 'demo123'
+                        })
+                    });
+                    
+                    const loginData = await loginResponse.json();
+                    
+                    if (loginData.success) {
+                        updateStatus('✅ All systems operational! Backend and database connected.');
+                    } else {
+                        updateStatus('⚠️ Backend connected but login failed: ' + loginData.error);
+                    }
+                } else {
+                    updateStatus('❌ Backend not responding');
+                }
+            } catch (error) {
+                updateStatus('❌ Connection test failed: ' + error.message);
+            }
+        }
+
+        // Auto-test on load
+        setTimeout(runTests, 1000);
+    </script>
+</body>
+</html>

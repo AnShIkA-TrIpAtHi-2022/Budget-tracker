@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Cache & Test - Budget Tracker</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f3f4f6; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        button { width: 100%; padding: 12px; margin: 10px 0; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #2563eb; }
+        .result { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        .success { background: #d1fae5; color: #065f46; border: 1px solid #10b981; }
+        .error { background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+        .warning { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🧹 Cache Management & Testing</h2>
+        
+        <button onclick="clearAllCaches()">Clear All Caches</button>
+        <button onclick="unregisterServiceWorker()">Unregister Service Worker</button>
+        <button onclick="testBackend()">Test Backend Connection</button>
+        <button onclick="openApp()">Open Fresh App</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const resultDiv = document.getElementById('result');
+        
+        function log(message, type = 'success') {
+            resultDiv.innerHTML += `<div class="result ${type}">${message}</div>`;
+        }
+        
+        function clearResult() {
+            resultDiv.innerHTML = '';
+        }
+        
+        async function clearAllCaches() {
+            clearResult();
+            log('🧹 Clearing all caches...', 'warning');
+            
+            try {
+                // Clear all caches
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(
+                        cacheNames.map(cacheName => caches.delete(cacheName))
+                    );
+                    log(`✅ Cleared ${cacheNames.length} cache(s)`);
+                }
+                
+                // Clear localStorage
+                localStorage.clear();
+                log('✅ Cleared localStorage');
+                
+                // Clear sessionStorage
+                sessionStorage.clear();
+                log('✅ Cleared sessionStorage');
+                
+                log('🎉 All caches cleared successfully!');
+                
+            } catch (error) {
+                log(`❌ Error clearing caches: ${error.message}`, 'error');
+            }
+        }
+        
+        async function unregisterServiceWorker() {
+            clearResult();
+            log('🔧 Unregistering service worker...', 'warning');
+            
+            try {
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                    }
+                    
+                    log(`✅ Unregistered ${registrations.length} service worker(s)`);
+                } else {
+                    log('⚠️ Service Worker not supported');
+                }
+            } catch (error) {
+                log(`❌ Error unregistering service worker: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testBackend() {
+            clearResult();
+            log('🔍 Testing backend connection...', 'warning');
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/', {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('✅ Backend is responding correctly');
+                    log(`📊 API Version: ${data.version}`);
+                } else {
+                    log(`❌ Backend responded with status: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Backend connection failed: ${error.message}`, 'error');
+                log('💡 Make sure the backend server is running on port 3001', 'warning');
+            }
+        }
+        
+        function openApp() {
+            clearResult();
+            log('🚀 Opening fresh application...', 'warning');
+            
+            // Add cache-busting parameter
+            const url = `http://localhost:5173?_t=${Date.now()}`;
+            window.open(url, '_blank');
+            
+            log('✅ App opened in new tab');
+            log('💡 Check browser console for any remaining errors', 'warning');
+        }
+        
+        // Auto-test on load
+        window.onload = () => {
+            testBackend();
+        };
+    </script>
+</body>
+</html>

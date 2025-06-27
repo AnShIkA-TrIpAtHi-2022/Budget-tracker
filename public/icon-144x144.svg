@@ -1,0 +1,7 @@
+<!-- This is a placeholder for PWA icons. In a real project, you would use proper PNG icon files -->
+<!-- For now, I'll create SVG icons that can serve as placeholders -->
+
+<svg width="144" height="144" xmlns="http://www.w3.org/2000/svg">
+  <rect width="144" height="144" fill="#4F46E5"/>
+  <text x="72" y="80" text-anchor="middle" fill="white" font-size="48" font-family="Arial">💰</text>
+</svg>
