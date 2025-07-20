@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Moon, Sun, Plus, Edit, TrendingUp, PieChart } from 'lucide-react'
+import { Moon, Sun, Plus, Edit, TrendingUp, PieChart, BarChart3 } from 'lucide-react'
 import { BudgetProvider } from './context/BudgetContext'
 import ExpenseManager from './components/ExpenseManager'
 import CategoryManager from './components/CategoryManager'
-import Analytics from './components/Analytics'
+import AnalyticsDashboard from './components/AnalyticsDashboard'
 import Sidebar from './components/Sidebar'
 import './App.css'
 
@@ -41,7 +41,7 @@ function App() {
   const tabs = [
     { id: 'expenses', label: 'Expenses', icon: Plus },
     { id: 'categories', label: 'Categories', icon: Edit },
-    { id: 'analytics', label: 'Analytics', icon: PieChart }
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 }
   ]
 
   const renderActiveTab = () => {
@@ -51,7 +51,7 @@ function App() {
       case 'categories':
         return <CategoryManager />
       case 'analytics':
-        return <Analytics />
+        return <AnalyticsDashboard />
       default:
         return <ExpenseManager />
     }

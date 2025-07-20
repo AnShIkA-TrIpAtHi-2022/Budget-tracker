@@ -44,13 +44,18 @@ router.get('/', async (req, res, next) => {
     const sort = {}
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1
 
-    const expenses = await Expense.find(filter)
+    // Support getting all expenses when limit is very high
+    const limitValue = parseInt(limit)
+    let query = Expense.find(filter)
       .populate('category', 'name color')
       .sort(sort)
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .exec()
 
+    // Only apply pagination if limit is reasonable (less than 10000)
+    if (limitValue < 10000) {
+      query = query.limit(limitValue).skip((page - 1) * limitValue)
+    }
+
+    const expenses = await query.exec()
     const total = await Expense.countDocuments(filter)
 
     res.status(200).json({
@@ -59,8 +64,8 @@ router.get('/', async (req, res, next) => {
       total,
       pagination: {
         page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / limit)
+        limit: limitValue,
+        pages: Math.ceil(total / limitValue)
       },
       data: expenses
     })
@@ -97,13 +102,13 @@ router.get('/:id', async (req, res, next) => {
 // @access  Public
 router.post('/', async (req, res, next) => {
   try {
-    const { title, amount, category, date, description } = req.body
+    const { remarks, amount, category, date, description } = req.body
 
     // Validation
-    if (!title || !amount || !category) {
+    if (!amount || !category) {
       return res.status(400).json({
         success: false,
-        error: 'Please provide title, amount, and category'
+        error: 'Please provide amount and category'
       })
     }
 

@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
-import { PieChart, BarChart3, TrendingUp, Calendar } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { PieChart, BarChart3, TrendingUp, Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useBudget } from '../context/BudgetContext'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek } from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,6 +13,7 @@ import {
   ArcElement,
   PointElement,
   LineElement,
+  Filler,
 } from 'chart.js'
 import { Pie, Bar, Line } from 'react-chartjs-2'
 
@@ -25,49 +26,103 @@ ChartJS.register(
   Legend,
   ArcElement,
   PointElement,
-  LineElement
+  LineElement,
+  Filler
 )
 
 export default function Analytics() {
   const { expenses, categories } = useBudget()
 
-  // Get current month expenses
-  const currentMonth = new Date()
-  const monthStart = startOfMonth(currentMonth)
-  const monthEnd = endOfMonth(currentMonth)
+  // State for selected month/year
+  const [selectedDate, setSelectedDate] = useState(new Date())
+
+  // Ensure we have arrays to work with
+  const safeExpenses = Array.isArray(expenses) ? expenses : []
+  const safeCategories = Array.isArray(categories) ? categories : []
+
+  console.log('📊 Analytics: Safe expenses:', safeExpenses.length)
+  console.log('📊 Analytics: Safe categories:', safeCategories.length)
+  console.log('📊 Analytics: All expenses dates:', safeExpenses.map(e => e.date))
+  console.log('📊 Analytics: All expenses full data:', safeExpenses)
+
+  // Get selected month expenses
+  const selectedMonth = selectedDate.getMonth()
+  const selectedYear = selectedDate.getFullYear()
+  const monthStart = startOfMonth(new Date(selectedYear, selectedMonth, 1))
+  const monthEnd = endOfMonth(new Date(selectedYear, selectedMonth, 1))
   
-  const currentMonthExpenses = expenses.filter(expense => {
+  console.log('📅 Analytics: Selected date:', selectedDate)
+  console.log('📅 Analytics: Month start:', monthStart)
+  console.log('📅 Analytics: Month end:', monthEnd)
+  
+  const selectedMonthExpenses = safeExpenses.filter(expense => {
+    // Parse the expense date and normalize to local timezone
     const expenseDate = new Date(expense.date)
-    return expenseDate >= monthStart && expenseDate <= monthEnd
+    const expenseYear = expenseDate.getFullYear()
+    const expenseMonth = expenseDate.getMonth()
+    
+    // Compare year and month directly to avoid timezone issues
+    const isInSelectedMonth = expenseYear === selectedYear && expenseMonth === selectedMonth
+    
+    // Only log if we're in May for debugging
+    if (selectedMonth === 4) { // May is month 4 (0-indexed)
+      console.log('📅 Analytics: May expense check:', {
+        expenseDate: expense.date,
+        expenseYear,
+        expenseMonth,
+        selectedYear,
+        selectedMonth,
+        isInSelectedMonth
+      })
+    }
+    
+    return isInSelectedMonth
   })
 
-  // Get current week expenses
-  const weekStart = startOfWeek(new Date())
-  const weekEnd = endOfWeek(new Date())
+  console.log('📊 Analytics: Selected month expenses:', selectedMonthExpenses.length, 'for', format(selectedDate, 'MMMM yyyy'))
+  console.log('📊 Analytics: Selected month expenses data:', selectedMonthExpenses)
+
+  // Get current week expenses (treating today as the last day of the week)
+  const today = new Date()
+  const weekEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999)
+  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6, 0, 0, 0, 0)
   
-  const currentWeekExpenses = expenses.filter(expense => {
+  console.log('📅 Analytics: Custom week start:', weekStart)
+  console.log('📅 Analytics: Custom week end (today):', weekEnd)
+  
+  const currentWeekExpenses = safeExpenses.filter(expense => {
     const expenseDate = new Date(expense.date)
     return expenseDate >= weekStart && expenseDate <= weekEnd
   })
 
   // Category-wise data for pie chart
   const categoryData = useMemo(() => {
+    console.log('📊 Analytics: Processing category data...')
+    console.log('📊 Analytics: Selected month expenses:', selectedMonthExpenses)
+    console.log('📊 Analytics: Available categories:', safeCategories)
+    
     const categoryTotals = {}
-    currentMonthExpenses.forEach(expense => {
-      const category = categories.find(c => c.id === expense.categoryId)
-      if (category) {
+    selectedMonthExpenses.forEach(expense => {
+      // expense.category is populated with {_id, name, color} by the backend
+      const category = expense.category
+      if (category && category.name) {
         categoryTotals[category.name] = (categoryTotals[category.name] || 0) + expense.amount
+      } else {
+        console.log('📊 Analytics: Category not found or not populated for expense:', expense)
       }
     })
+
+    console.log('📊 Analytics: Category totals:', categoryTotals)
 
     const labels = Object.keys(categoryTotals)
     const data = Object.values(categoryTotals)
     const colors = labels.map(label => {
-      const category = categories.find(c => c.name === label)
-      return category ? category.color : '#6b7280'
+      // Find the category by name since expenses have populated category objects
+      const categoryFromExpense = selectedMonthExpenses.find(e => e.category?.name === label)?.category
+      return categoryFromExpense ? categoryFromExpense.color : '#6b7280'
     })
 
-    return {
+    const result = {
       labels,
       datasets: [
         {
@@ -78,16 +133,29 @@ export default function Analytics() {
         },
       ],
     }
-  }, [currentMonthExpenses, categories])
+    
+    console.log('📊 Analytics: Final category chart data:', result)
+    return result
+  }, [selectedMonthExpenses])
 
-  // Daily expenses for bar chart (current week)
+  // Daily expenses for bar chart (this week with today as last day)
   const dailyData = useMemo(() => {
-    const days = eachDayOfInterval({ start: weekStart, end: weekEnd })
+    // Create array of 7 days ending with today
+    const days = []
+    for (let i = 6; i >= 0; i--) {
+      const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i)
+      days.push(day)
+    }
+    
+    console.log('📊 Analytics: Week days (today as last):', days.map(d => format(d, 'yyyy-MM-dd')))
+    
     const dailyTotals = days.map(day => {
       const dayExpenses = currentWeekExpenses.filter(expense => 
         format(new Date(expense.date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
       )
-      return dayExpenses.reduce((total, expense) => total + expense.amount, 0)
+      const total = dayExpenses.reduce((total, expense) => total + expense.amount, 0)
+      console.log(`📊 Analytics: ${format(day, 'EEE yyyy-MM-dd')}: $${total}`)
+      return total
     })
 
     return {
@@ -103,7 +171,7 @@ export default function Analytics() {
         },
       ],
     }
-  }, [currentWeekExpenses, weekStart, weekEnd])
+  }, [currentWeekExpenses, today])
 
   // Monthly trend (last 6 months)
   const monthlyTrendData = useMemo(() => {
@@ -116,7 +184,7 @@ export default function Analytics() {
       const monthStart = startOfMonth(date)
       const monthEnd = endOfMonth(date)
       
-      const monthExpenses = expenses.filter(expense => {
+      const monthExpenses = safeExpenses.filter(expense => {
         const expenseDate = new Date(expense.date)
         return expenseDate >= monthStart && expenseDate <= monthEnd
       })
@@ -144,7 +212,7 @@ export default function Analytics() {
         },
       ],
     }
-  }, [expenses])
+  }, [safeExpenses])
 
   const chartOptions = {
     responsive: true,
@@ -224,11 +292,91 @@ export default function Analytics() {
     },
   }
 
-  const totalExpenses = currentMonthExpenses.reduce((total, expense) => total + expense.amount, 0)
+  const totalExpenses = selectedMonthExpenses.reduce((total, expense) => total + expense.amount, 0)
   const weeklyTotal = currentWeekExpenses.reduce((total, expense) => total + expense.amount, 0)
 
+  // Helper functions for month navigation
+  const goToPreviousMonth = () => {
+    const newDate = new Date(selectedDate)
+    newDate.setMonth(newDate.getMonth() - 1)
+    console.log('⬅️ Analytics: Going to previous month:', format(newDate, 'MMMM yyyy'))
+    setSelectedDate(newDate)
+  }
+
+  const goToNextMonth = () => {
+    const newDate = new Date(selectedDate)
+    newDate.setMonth(newDate.getMonth() + 1)
+    console.log('➡️ Analytics: Going to next month:', format(newDate, 'MMMM yyyy'))
+    setSelectedDate(newDate)
+  }
+
+  const goToCurrentMonth = () => {
+    const newDate = new Date()
+    console.log('🏠 Analytics: Going to current month:', format(newDate, 'MMMM yyyy'))
+    setSelectedDate(newDate)
+  }
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowLeft') {
+      goToPreviousMonth()
+    } else if (e.key === 'ArrowRight') {
+      goToNextMonth()
+    } else if (e.key === 'Home') {
+      goToCurrentMonth()
+    }
+  }
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" onKeyDown={handleKeyDown} tabIndex={0}>
+      {/* Month Selector */}
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6"
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Analytics</h2>
+          
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={goToPreviousMonth}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              title="Previous month (←)"
+            >
+              <ChevronLeft className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            </button>
+            
+            <div className="flex items-center space-x-2">
+              <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <span className="text-lg font-medium text-gray-900 dark:text-white min-w-[140px] text-center">
+                {format(selectedDate, 'MMMM yyyy')}
+              </span>
+            </div>
+            
+            <button
+              onClick={goToNextMonth}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              title="Next month (→)"
+            >
+              <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+            </button>
+            
+            <button
+              onClick={goToCurrentMonth}
+              className="px-3 py-2 text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-400 rounded-lg transition-colors"
+              title="Go to current month (Home)"
+            >
+              Current Month
+            </button>
+          </div>
+        </div>
+        
+        <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
+          Use ← → arrow keys to navigate months, Home key for current month
+        </div>
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
@@ -236,10 +384,12 @@ export default function Analytics() {
             <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
               <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">This Month</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {format(selectedDate, 'MMMM yyyy')}
+            </h3>
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">${totalExpenses.toFixed(2)}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{currentMonthExpenses.length} expenses</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{selectedMonthExpenses.length} expenses</p>
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
@@ -247,7 +397,7 @@ export default function Analytics() {
             <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
               <BarChart3 className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">This Week</h3>
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">Last 7 Days</h3>
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white">${weeklyTotal.toFixed(2)}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">{currentWeekExpenses.length} expenses</p>
@@ -276,7 +426,7 @@ export default function Analytics() {
               <PieChart className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Category Distribution (This Month)
+              Category Distribution ({format(selectedDate, 'MMM yyyy')})
             </h3>
           </div>
           <div className="h-80">
@@ -284,7 +434,9 @@ export default function Analytics() {
               <Pie data={categoryData} options={pieOptions} />
             ) : (
               <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500 dark:text-gray-400">No expenses this month</p>
+                <p className="text-gray-500 dark:text-gray-400">
+                  No expenses in {format(selectedDate, 'MMMM yyyy')}
+                </p>
               </div>
             )}
           </div>
@@ -297,7 +449,7 @@ export default function Analytics() {
               <BarChart3 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Daily Expenses (This Week)
+              Daily Expenses (Last 7 Days)
             </h3>
           </div>
           <div className="h-80">

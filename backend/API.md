@@ -1,3 +1,4 @@
+
 # Budget Tracker API Documentation
 
 ## Base URL
